@@ -1,14 +1,12 @@
 import streamlit as st
 import pandas as pd
 import re
-from dotenv import load_dotenv
 import os
 import logging
 from googleapiclient.discovery import build
 
-# Load API key from .env file
-load_dotenv()
-api_key = os.getenv('YOUTUBE_API_KEY')
+# Load API key from Streamlit secrets
+api_key = st.secrets["YOUTUBE_API_KEY"]
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
