@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 import os
 import logging
 import subprocess
+subprocess.call(["pip", "install", "google-api-python-client"])
+from apiclient.discovery import build
 
-# Clear cache
-subprocess.run(["streamlit", "clear_cache"])
 # Load API key from .env file
 load_dotenv()
 api_key = os.getenv('YOUTUBE_API_KEY')
