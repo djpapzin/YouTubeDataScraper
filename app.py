@@ -4,12 +4,6 @@ import re
 from dotenv import load_dotenv
 import os
 import logging
-import subprocess
-
-# Install google-api-python-client library
-subprocess.call(["pip", "install", "google-api-python-client"])
-
-# Now import the library
 from googleapiclient.discovery import build
 
 # Load API key from .env file
