@@ -1,10 +1,16 @@
 import streamlit as st
-from googleapiclient.discovery import build
 import pandas as pd
 import re
 from dotenv import load_dotenv
 import os
 import logging
+import subprocess
+
+# Install google-api-python-client library
+subprocess.call(["pip", "install", "google-api-python-client"])
+
+# Now import the library
+from googleapiclient.discovery import build
 
 # Load API key from .env file
 load_dotenv()
@@ -21,10 +27,12 @@ def extract_video_id(url):
         r"(?<=embed\/)[^\"?]+",
         r"(?<=youtu.be\/)[^\"?]+"
     ]
+
     for pattern in patterns:
         video_id = re.search(pattern, url)
         if video_id:
             return video_id.group(0)
+
     return None
 
 # Function to scrape YouTube comments
@@ -76,7 +84,6 @@ def scrape_youtube_comments(api_key, video_id):
         # Create a DataFrame from the comments list
         df = pd.DataFrame(comments, columns=["Name", "Comment", "Likes", "Time", "Reply Count"])
         total_comments = len(comments)
-
         return df, total_comments
 
     except Exception as e:
