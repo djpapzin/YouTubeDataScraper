@@ -45,15 +45,27 @@ def scrape_youtube_comments(api_key, video_id):
             response = request.execute()
 
             # Add comments to the list
-            for comment_thread in response["items"]:
-                comment = comment_thread["snippet"]["topLevelComment"]["snippet"]["textDisplay"]
-                comments.append(comment)
+            for item in response["items"]:
+                comment = item["snippet"]["topLevelComment"]["snippet"]
+                comments.append([
+                    comment["authorDisplayName"],
+                    comment["textDisplay"],
+                    comment["likeCount"],
+                    comment["publishedAt"],
+                    item["snippet"]["totalReplyCount"]
+                ])
 
                 # Add replies to the list
-                if "replies" in comment_thread:
-                    for reply in comment_thread["replies"]["comments"]:
-                        reply_text = reply["snippet"]["textDisplay"]
-                        comments.append(reply_text)
+                if "replies" in item:
+                    for reply in item["replies"]["comments"]:
+                        reply_comment = reply["snippet"]
+                        comments.append([
+                            reply_comment["authorDisplayName"],
+                            reply_comment["textDisplay"],
+                            reply_comment["likeCount"],
+                            reply_comment["publishedAt"],
+                            0  # Replies do not have replies
+                        ])
 
             # Check if there are more pages of comments
             if "nextPageToken" in response:
@@ -62,7 +74,7 @@ def scrape_youtube_comments(api_key, video_id):
                 break
 
         # Create a DataFrame from the comments list
-        df = pd.DataFrame(comments, columns=["Comment"])
+        df = pd.DataFrame(comments, columns=["Name", "Comment", "Likes", "Time", "Reply Count"])
         total_comments = len(comments)
 
         return df, total_comments
