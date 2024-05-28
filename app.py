@@ -29,7 +29,7 @@ def extract_video_id(url):
 
 # Function to scrape YouTube comments
 def scrape_youtube_comments(api_key, video_id):
-    youtube = build('youtube', 'v3', developerKey=api_key)
+    youtube = build('youtube', 'v3', developerKey=api_key, cache_discovery=False)
     comments = []
 
     try:
