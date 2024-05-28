@@ -1,9 +1,9 @@
-# YouTubeScraper
+# YouTubeDataScraper
 
-Scraping YouTube Video Description and Video Likes and Comments and Date, Times and Replies. It's Automatically Extracting Data from Video.
+A tool to scrape YouTube video data including comments, likes, and more.
 
 ## Features
-- Count 
+- Count
 - Video Description
 - Video Comments
 - Video Likes Count
@@ -11,19 +11,50 @@ Scraping YouTube Video Description and Video Likes and Comments and Date, Times 
 - Time And Date
 - Video Comments Reply
 
+## Upcoming Features
+- Extracting more video metadata (views, duration, etc.)
+- Fetching video details from a playlist
+- Sentiment analysis for comments
+- Enhanced output formats (Excel, Database)
+
 ## How to Setup
-- Go to https://console.cloud.google.com/ (Search YouTube Data API v3).
-- Click on Enable And Click Credential And Click Api Key.
-- After clicking Create Credential, Copy "api_key" from there & "Video ID" from YouTube Video. (This will be used in setup.py).
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/your-username/YouTubeDataScraper.git
+   cd YouTubeDataScraper
+   ```
+
+2. **Install Requirements**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Setup API Key and Video ID**:
+   - Create a file named `config.data` and add your API key and video ID:
+     ```
+     [cred]
+     id = YOUR_API_KEY
+     hash = VIDEO_ID
+     ```
 
 ## How to Use
-- Run Setup File & Scraper File.
-- The final output will be stored in a CSV/JSON file same directory path.
+1. **Run the Setup Script**:
+   ```bash
+   python Setup.py
+   ```
 
-![yts](https://user-images.githubusercontent.com/49250151/109396855-c80ac300-795d-11eb-9206-c5159e8f4847.PNG)
+2. **Run the Scraper**:
+   ```bash
+   python YT_Scraper.py
+   ```
+
+3. **Check the Output**:
+   - The final output will be stored in a `CSV` file in the same directory.
 
 ## Requirements
 - Python 3.5+
+- Pandas
+- Google API Client
 
 ## Supported Devices
 - Linux
@@ -32,17 +63,21 @@ Scraping YouTube Video Description and Video Likes and Comments and Date, Times 
 - BSD
 - Termux
 
-For any kind of help, support, payment, donate, suggestion and request ask me on Gmail / Telegram:
+## Contact
+For any help, support, suggestions, or requests, contact me on [Gmail](mailto:your-email@gmail.com) / [Telegram](https://t.me/YourTelegramUsername).
 
-<a href="https://t.me/CyberClans"><img src="https://img.shields.io/badge/Telegram-Group%20Telegram%20Join-blue.svg?logo=telegram"></a>
+## Disclaimer
+This is a research project. Use it at your own risk. I am not responsible for any misuse of this tool.
+```
 
-## Follow On
-<p align="left">
-<a href="https://github.com/palahsu"><img src="https://img.shields.io/badge/GitHub-Follow%20on%20GitHub-inactive.svg?logo=github"></a>
-</p><p align="left">
-<a href="https://www.facebook.com/aduri.knox01/"><img src="https://img.shields.io/badge/Facebook-Follow%20on%20Facebook-blue.svg?logo=facebook"></a>
-</p><p align="left">
-<a href="https://t.me/AD0000000"><img src="https://img.shields.io/badge/Telegram-Contact%20Telegram%20Profile-blue.svg?logo=telegram"></a>
-</p><p align="left"> 
+### Next Steps
+1. **Make the Initial Enhancements**:
+   - Start by making some of the suggested enhancements or any other features you have in mind.
 
-> **Disclaimer**<a name="disclaimer" />: Please note that this is a research project. I am by no means responsible for any usage of this tool. Use it on your behalf. I am not responsible if your accounts are banned due to extensive use of this tool. I am not responsible for any damages, this scripts and tools only for testing purpose. Everything here in this repository has been made for educational purposes, testing environment only. Thanks.
+2. **Push the Changes**:
+   - Commit and push your changes to your GitHub repository regularly.
+
+3. **Collaborate and Share**:
+   - Share your repository link with collaborators or friends who might be interested in contributing.
+
+By following these steps, you'll have your own customized version of the YouTube data scraper project, ready for further development and enhancements.
