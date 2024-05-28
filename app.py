@@ -5,8 +5,6 @@ import re
 
 # Function to extract video ID from YouTube URL
 def extract_video_id(url):
-    # Remove query string if present
-    url = url.split("?")[0]
     video_id = re.search(r"(?<=v=)[^&#]+", url)
     if video_id is None:
         video_id = re.search(r"(?<=be/)[^&#]+", url)
@@ -45,7 +43,7 @@ def scrape_youtube_comments(api_key, video_id):
             break
 
     df = pd.DataFrame(comments, columns=["Name", "Comment", "Likes", "Time", "Reply Count"])
-    return df
+    return df, len(comments)
 
 # Streamlit app
 st.title("YouTube Data Scraper")
@@ -57,8 +55,8 @@ if st.button("Scrape Comments"):
     video_id = extract_video_id(video_url)
     if video_id:
         with st.spinner("Scraping comments..."):
-            df = scrape_youtube_comments(api_key, video_id)
-            st.success("Scraping complete!")
+            df, total_comments = scrape_youtube_comments(api_key, video_id)
+            st.success(f"Scraping complete! Total Comments: {total_comments}")
             st.write(df)
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button(label="Download CSV", data=csv, file_name="youtube_comments.csv", mime="text/csv")
