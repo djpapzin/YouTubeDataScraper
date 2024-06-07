@@ -6,6 +6,9 @@ textblob
 matplotlib
 seaborn
 wordcloud
-gensim
+gensim==4.3.2
+scipy==1.9.3
 plotly
 streamlit-aggrid
+google-generativeai
+oauth2client<4.0.0

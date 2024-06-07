@@ -1,21 +1,37 @@
-import streamlit as st
-import pandas as pd
-import re
 import logging
+import re
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pandas import to_datetime
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from textblob import TextBlob
-import matplotlib.pyplot as plt
-import seaborn as sns
 from wordcloud import WordCloud
+import gensim
+import plotly.express as px
+import streamlit as st
 from st_aggrid import AgGrid, GridUpdateMode, DataReturnMode
 from st_aggrid.grid_options_builder import GridOptionsBuilder
-import gensim
 from gensim import corpora
-import plotly.express as px
+import google.generativeai as genai
 
 # Load API key from Streamlit secrets
-api_key = st.secrets["YOUTUBE_API_KEY"]
+gemini_api_key = st.secrets["general"]["GEMINI_API_KEY"]
+youtube_api_key = st.secrets["general"]["YOUTUBE_API_KEY"]
+
+# Configure Gemini
+genai.configure(api_key=gemini_api_key)
+
+generation_config = {
+    "temperature": 0.7,
+    "top_p": 0.95,
+    "top_k": 64,
+    "max_output_tokens": 8192,
+    "response_mime_type": "text/plain",
+}
+model = genai.GenerativeModel(model_name="gemini-1.5-flash", generation_config=generation_config,)
+chat_session = model.start_chat()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -34,7 +50,7 @@ def extract_video_id(url):
             return video_id.group(0)
     return None
 
-# Function to perform sentiment analysis
+# Function to perform sentiment analysis using TextBlob
 def analyze_sentiment(comment):
     analysis = TextBlob(comment)
     if analysis.sentiment.polarity > 0:
@@ -45,8 +61,8 @@ def analyze_sentiment(comment):
         return 'Negative'
 
 # Function to scrape YouTube comments
-def scrape_youtube_comments(api_key, video_id):
-    youtube = build('youtube', 'v3', developerKey=api_key, cache_discovery=False)
+def scrape_youtube_comments(youtube_api_key, video_id):
+    youtube = build('youtube', 'v3', developerKey=youtube_api_key, cache_discovery=False)
     comments = []
     try:
         next_page_token = None
@@ -93,6 +109,8 @@ def scrape_youtube_comments(api_key, video_id):
             progress_bar.progress(min(page_count / 10, 1.0))
 
         df = pd.DataFrame(comments, columns=["Name", "Comment", "Likes", "Time", "Reply Count", "Sentiment"])
+        # Convert 'Time' to datetime in the DataFrame
+        df['Time'] = pd.to_datetime(df['Time'], utc=True)  # Convert 'Time' to datetime
         total_comments = len(comments)
         return df, total_comments
 
@@ -105,6 +123,10 @@ def scrape_youtube_comments(api_key, video_id):
         st.error(f"Error scraping comments: {e}")
         return None, None
 
+def generate_reply(model, chat_session, comment, video_description):
+    # TO DO
+    pass
+
 # Function to generate a word cloud
 def generate_word_cloud(text, stopwords=None, colormap='viridis', contour_color='steelblue'):
     wordcloud = WordCloud(width=800, height=400, background_color='white', stopwords=stopwords, colormap=colormap, contour_color=contour_color).generate(text)
@@ -112,20 +134,6 @@ def generate_word_cloud(text, stopwords=None, colormap='viridis', contour_color=
     plt.imshow(wordcloud, interpolation='bilinear')
     plt.axis('off')
     st.pyplot(plt)
-
-# Function to filter comments
-def filter_comments(df, filter_criteria):
-    filtered_df = df.copy()
-    if "sentiment" in filter_criteria:
-        filtered_df = filtered_df[filtered_df["Sentiment"].isin(filter_criteria["sentiment"])]
-    if "min_likes" in filter_criteria:
-        filtered_df = filtered_df[filtered_df["Likes"] >= filter_criteria["min_likes"]]
-    if "keywords" in filter_criteria:
-        filtered_df = filtered_df[filtered_df["Comment"].str.contains('|'.join(filter_criteria["keywords"]), case=False)]
-    if "start_date" in filter_criteria and "end_date" in filter_criteria:
-        filtered_df['Time'] = pd.to_datetime(filtered_df['Time'])
-        filtered_df = filtered_df[(filtered_df['Time'] >= filter_criteria["start_date"]) & (filtered_df['Time'] <= filter_criteria["end_date"])]
-    return filtered_df
 
 # Function to analyze comment length
 def analyze_comment_length(df):
@@ -149,7 +157,7 @@ def get_top_commenters(df, by="comments", top_n=10):
     else:
         st.error("Invalid option for 'by'. Choose 'comments' or 'likes'.")
         return
-    st.write(f"Top {top_n} Commenters by {by.capitalize()}:")
+    st.write(f"Top {top_n} Commenters by {by.capitalize()}:\")")
     st.write(top_commenters)
 
 # Function to export visualization
@@ -160,6 +168,7 @@ def export_visualization(fig, filename):
 # Function to analyze sentiment over time
 def analyze_sentiment_over_time(df):
     df["Date"] = pd.to_datetime(df["Time"]).dt.date
+    df['Time'] = pd.to_datetime(df['Time'])
     sentiment_over_time = df.groupby(["Date", "Sentiment"]).size().unstack(fill_value=0)
     fig = px.line(sentiment_over_time, title='Sentiment Over Time')
     st.plotly_chart(fig)
@@ -174,9 +183,27 @@ def display_interactive_table(df):
 
 # Function to extract topics from comments
 def extract_topics(df, num_topics=5, num_words=10):
+    if df['Comment'].isnull().all():
+        st.write("No comments to analyze.")
+        return
+
     comments = df['Comment'].str.lower().str.split()
+    comments = [comment for comment in comments if comment]
+
+    if not comments:
+        st.write("No valid comments to analyze.")
+        return
+
     dictionary = corpora.Dictionary(comments)
+    if len(dictionary) == 0:
+        st.write("No tokens found in comments.")
+        return
+
     corpus = [dictionary.doc2bow(comment) for comment in comments]
+    if not corpus:
+        st.write("No terms in the corpus to analyze.")
+        return
+
     lda_model = gensim.models.LdaMulticore(corpus, num_topics=num_topics, id2word=dictionary, passes=10, workers=2)
     topics = lda_model.print_topics(num_words=num_words)
     st.write("Extracted Topics:")
@@ -184,8 +211,8 @@ def extract_topics(df, num_topics=5, num_words=10):
         st.write(f"Topic {idx + 1}: {topic}")
 
 # Function to get trending videos
-def get_trending_videos(api_key):
-    youtube = build('youtube', 'v3', developerKey=api_key, cache_discovery=False)
+def get_trending_videos(youtube_api_key):
+    youtube = build('youtube', 'v3', developerKey=youtube_api_key, cache_discovery=False)
     request = youtube.videos().list(part="snippet,statistics", chart="mostPopular", regionCode="US", maxResults=10)
     response = request.execute()
     videos = []
@@ -215,27 +242,72 @@ def calculate_engagement(df):
     return df
 
 # Function to monitor API quota
-def api_quota_monitor(api_key):
-    youtube = build('youtube', 'v3', developerKey=api_key, cache_discovery=False)
-    quota_request = youtube.videos().list(part="id", chart="mostPopular", regionCode="US")
-    quota_response = quota_request.execute()
-    return quota_response.get('quota_remaining', None)
+def api_quota_monitor(gemini_api_key):
+    genai.configure(api_key=gemini_api_key)  # Configure for Gemini
+    try:
+        # Make a simple request to Gemini to get quota info
+        response = genai.generate_text(
+            model="models/gemini-1.5-flash",  # Use Gemini Pro model
+            prompt="Hello, world!",
+        )
+        return response.get('quota_remaining', None)
+    except HttpError as e:
+        print(f"An HTTP error occurred: {e.resp.status} {e.content}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    return None
+
+# Function to summarize comments
+def summarize_comments(model, chat_session, comments):
+    """Summarizes all comments in the list.
+
+    Args:
+        model: The Gemini model object.
+        chat_session: The chat session object.
+        comments: A list of comments to summarize.
+
+    Returns:
+        A string containing the summary of all comments.
+    """
+    if not comments:
+        return "No comments to summarize."
+    
+    # Combine all comments into a single string
+    all_comments = "\n\n".join(comments)
+    prompt = f"Summarize the following YouTube comments:\n\n{all_comments}"
+    try:
+        response = chat_session.send_message(prompt)
+        return response.text.strip()
+    except Exception as e:
+        logging.error(f"Error summarizing comments: {e}")
+        return "Error summarizing comments."
+
 
 # Streamlit App
 st.title("YouTube Comment Scraper and Analyzer")
 
+# Initialize session state
+if 'df' not in st.session_state:
+    st.session_state['df'] = pd.DataFrame()
+if 'filtered_df' not in st.session_state:
+    st.session_state['filtered_df'] = pd.DataFrame()
+
 video_url = st.text_input("Enter YouTube video URL")
-if st.button("Scrape Comments"):
+
+# Scrape Comments Button
+if st.button("Scrape Comments", key="scrape_comments_button"):  # Unique key
     video_id = extract_video_id(video_url)
     if video_id:
         with st.spinner("Scraping comments..."):
             progress_bar = st.progress(0)
-            df, total_comments = scrape_youtube_comments(api_key, video_id)
+            df, total_comments = scrape_youtube_comments(youtube_api_key, video_id)
             progress_bar.progress(1)
             if df is None or total_comments is None:
                 st.error("Error scraping comments. Please try again.")
             else:
                 st.success(f"Scraping complete! Total Comments: {total_comments}")
+                # Store the original DataFrame
+                st.session_state['df'] = df.copy()  # Store the scraped DataFrame
                 st.write(df)
                 csv = df.to_csv(index=False).encode('utf-8')
                 st.download_button(label="Download CSV", data=csv, file_name="youtube_comments.csv", mime="text/csv")
@@ -253,28 +325,6 @@ if st.button("Scrape Comments"):
                 st.subheader("Word Cloud")
                 all_comments = ' '.join(df['Comment'])
                 generate_word_cloud(all_comments)
-
-                # Filter Comments
-                st.subheader("Filter Comments")
-                sentiment_filter = st.selectbox("Filter by Sentiment", ["All", "Positive", "Negative"])
-                if sentiment_filter != "All":
-                    df = df[df['Sentiment'] == sentiment_filter]
-
-                min_likes_filter = st.number_input("Filter by Minimum Likes", min_value=0, step=1)
-                if min_likes_filter > 0:
-                    df = df[df["Likes"] >= min_likes_filter]
-
-                keyword_filter = st.text_input("Filter by Keywords (separate by comma)")
-                if keyword_filter:
-                    keywords = [kw.strip() for kw in keyword_filter.split(",")]
-                    df = df[df["Comment"].str.contains('|'.join(keywords), case=False)]
-
-                start_date_filter = st.date_input("Start Date")
-                end_date_filter = st.date_input("End Date")
-                if start_date_filter and end_date_filter:
-                    df = filter_comments(df, {"start_date": start_date_filter, "end_date": end_date_filter})
-
-                st.write(df)
 
                 # Comment Length Analysis
                 st.subheader("Comment Length Analysis")
@@ -309,19 +359,24 @@ if st.button("Scrape Comments"):
                 df = calculate_engagement(df)
                 st.write(df[["Name", "Comment", "EngagementScore"]].sort_values(by="EngagementScore", ascending=False))
 
+                # Comment Summary
+                st.subheader("Comment Summary")
+                st.write(summarize_comments(model, chat_session, df["Comment"].tolist()))
+
 # Display trending videos
 st.header("Trending Videos")
-trending_videos = get_trending_videos(api_key)
+trending_videos = get_trending_videos(youtube_api_key)
 if trending_videos:
     video_selection = st.selectbox("Select a trending video", [f"{video['title']} (by {video['channelTitle']})" for video in trending_videos])
     selected_video = next(video for video in trending_videos if f"{video['title']} (by {video['channelTitle']})" == video_selection)
     display_video_metadata(selected_video)
     
-    if st.button("Scrape Comments for Trending Video"):
+
+    if st.button("Scrape Comments for Trending Video", key="scrape_trending_comments_button"):  # Unique key
         video_id = selected_video['videoId']
         with st.spinner("Scraping comments..."):
             progress_bar = st.progress(0)
-            df, total_comments = scrape_youtube_comments(api_key, video_id)
+            df, total_comments = scrape_youtube_comments(youtube_api_key, video_id)
             progress_bar.progress(1)
             if df is None or total_comments is None:
                 st.error("Error scraping comments. Please try again.")
@@ -344,28 +399,6 @@ if trending_videos:
                 st.subheader("Word Cloud")
                 all_comments = ' '.join(df['Comment'])
                 generate_word_cloud(all_comments)
-
-                # Filter Comments
-                st.subheader("Filter Comments")
-                sentiment_filter = st.selectbox("Filter by Sentiment", ["All", "Positive", "Negative"])
-                if sentiment_filter != "All":
-                    df = df[df['Sentiment'] == sentiment_filter]
-
-                min_likes_filter = st.number_input("Filter by Minimum Likes", min_value=0, step=1)
-                if min_likes_filter > 0:
-                    df = df[df["Likes"] >= min_likes_filter]
-
-                keyword_filter = st.text_input("Filter by Keywords (separate by comma)")
-                if keyword_filter:
-                    keywords = [kw.strip() for kw in keyword_filter.split(",")]
-                    df = df[df["Comment"].str.contains('|'.join(keywords), case=False)]
-
-                start_date_filter = st.date_input("Start Date")
-                end_date_filter = st.date_input("End Date")
-                if start_date_filter and end_date_filter:
-                    df = filter_comments(df, {"start_date": start_date_filter, "end_date": end_date_filter})
-
-                st.write(df)
 
                 # Comment Length Analysis
                 st.subheader("Comment Length Analysis")
@@ -400,10 +433,16 @@ if trending_videos:
                 df = calculate_engagement(df)
                 st.write(df[["Name", "Comment", "EngagementScore"]].sort_values(by="EngagementScore", ascending=False))
 
+                # Comment Summary
+                st.subheader("Comment Summary")
+                st.write(summarize_comments(model, chat_session, df["Comment"].tolist()))
+
+
 # API Quota Monitor
 st.sidebar.subheader("API Quota Monitor")
-quota_remaining = api_quota_monitor(api_key)
-if quota_remaining:
+
+quota_remaining = api_quota_monitor(gemini_api_key)
+if quota_remaining is not None:
     st.sidebar.write(f"API Quota Remaining: {quota_remaining}")
 else:
     st.sidebar.write("Unable to retrieve API quota information.")
